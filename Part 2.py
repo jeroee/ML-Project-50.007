@@ -18,9 +18,20 @@ def load_train(training_file):
     df.columns = ['word', 'state']
     return df
 
+# def load_test(test_file):
+#     df = pd.read_csv(test_file, sep=' ', header = None, error_bad_lines=False)
+#     df.columns=['word']
+#     return df
+def load_test(testing_file):
+    ls = []
+    f = open(testing_file)
+    for line in f:
+        ls.append(line.strip('\n'))
+    df = pd.DataFrame(ls)
+    df.columns=['word']
+    return df
+
 # load empty emission probability table
-
-
 def create_matrix(df):
     new_df = pd.DataFrame(columns=df['state'].unique().tolist())
     unique_words = df['word'].unique().tolist()
@@ -30,8 +41,6 @@ def create_matrix(df):
     return new_df
 
 # obtaining emission probabilities from training data
-
-
 def df_calculate(df, new_df):
     '''
     returns a matrix with the emission parameters matrix.
@@ -86,8 +95,27 @@ def df_calculate_2(df, new_df):
     new_df = new_df.set_index(['unique_words'])
     return new_df
 
+def argmax(new_df):
+    tag_dict={}
+    for index, row in new_df.iterrows():
+        tag_dict[index]=new_df.columns[row.argmax()]
+    return tag_dict
 
-df = load_train(EN_train)
-new_df = create_matrix(df)
-output = df_calculate_2(df, new_df)
-print(output)
+def tag_system(tag_dict, testing_file):
+    test_df = load_test(testing_file)
+    test_ls = test_df['word'].tolist()
+
+    tag_states=[]
+    for i in test_ls:
+        if i in tag_dict.keys():
+            tag_states.append(tag_dict[i])
+        elif i=="":   # for blank lines, set state to be blank
+            tag_states.append("")
+        elif i not in tag_dict.keys():
+            tag_states.append(tag_dict['#UNK#'])
+
+    test_df['states']=tag_states
+    return test_df
+
+
+
