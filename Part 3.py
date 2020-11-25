@@ -11,7 +11,7 @@ SG_test = 'SG/dev.in'
 CN_test = 'CN/dev.in'
 
 # load training file
-def load_train(training_file):
+def load_train_trans(training_file):
     f = open('EN/train')
     ls_state = ['START']
     for line in f:
@@ -47,5 +47,5 @@ def relation_matrix(training_list):
 
 
 #Implement the Function
-temp = load_train(EN_train)
+temp = load_train_trans(EN_train)
 rls_matrix = relation_matrix(temp)
