@@ -12,7 +12,7 @@ CN_test = 'CN/dev.in'
 
 # load training file
 def load_train_trans(training_file):
-    f = open('EN/train')
+    f = open(training_file)
     ls_state = ['START']
     for line in f:
         item = line.strip('\n').split(' ')
