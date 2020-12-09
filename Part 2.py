@@ -84,7 +84,7 @@ def emissionMatrix_special(df, emission_matrix):
     for index, row in tqdm(df_merged.iterrows()):  # for every known probabilty
         # append into the emission matrix
         emission_matrix.loc[row['state'], row['word']] = row['Probability']
-    for i in df_train.state.unique().tolist():
+    for i in df.state.unique().tolist():
         emission_matrix.loc[i, '#UNK#'] = float(k/df_denominator.loc[i]+k)
     emission_matrix = emission_matrix.fillna(
         0)   # fill those null cells with zero
@@ -125,34 +125,34 @@ def save_df(df, path):
 
 
 # file paths
-EN_train = 'EN/train'
-SG_train = 'SG/train'
-CN_train = 'CN/train'
-EN_test = 'EN/dev.in'
-SG_test = 'SG/dev.in'
-CN_test = 'CN/dev.in'
-EN_pred_2 = 'EN/dev_p2.pred'
-SG_pred_2 = 'SG/dev_p2.pred'
-CN_pred_2 = 'CN/dev_p2.pred'
-files = [['EN', EN_train, EN_test, EN_pred_2],
-         ['SG', SG_train, SG_test, SG_pred_2],
-         ['CN', CN_train, CN_test, CN_pred_2]]
+# EN_train = 'EN/train'
+# SG_train = 'SG/train'
+# CN_train = 'CN/train'
+# EN_test = 'EN/dev.in'
+# SG_test = 'SG/dev.in'
+# CN_test = 'CN/dev.in'
+# EN_pred_2 = 'EN/dev_p2.pred'
+# SG_pred_2 = 'SG/dev_p2.pred'
+# CN_pred_2 = 'CN/dev_p2.pred'
+# files = [['EN', EN_train, EN_test, EN_pred_2],
+#          ['SG', SG_train, SG_test, SG_pred_2],
+#          ['CN', CN_train, CN_test, CN_pred_2]]
 
-print('Starting Part 2')
-start_time = time.time()
-for i in files:
-    print(f'starting {i[0]}')
-    df_train = load_train(i[1])
-    df_test = load_test(i[2])
-    emission_matrix = createMatrix(df_train)
-    emission_matrix = emissionMatrix_special(df_train, emission_matrix)
-    tags = argmax(emission_matrix)
-    df_output = tag_system(tags, df_test)
-    save_df(df_output, i[3])
-    print(f'{i[0]} completed')
+# print('Starting Part 2')
+# start_time = time.time()
+# for i in files:
+#     print(f'starting {i[0]}')
+#     df_train = load_train(i[1])
+#     df_test = load_test(i[2])
+#     emission_matrix = createMatrix(df_train)
+#     emission_matrix = emissionMatrix_special(df_train, emission_matrix)
+#     tags = argmax(emission_matrix)
+#     df_output = tag_system(tags, df_test)
+#     save_df(df_output, i[3])
+#     print(f'{i[0]} completed')
 
-print('Part 2 Complete')
-print(f'time elapsed {time.time()-start_time} seconds')
+# print('Part 2 Complete')
+# print(f'time elapsed {time.time()-start_time} seconds')
 
 
 # def create_matrix(df):

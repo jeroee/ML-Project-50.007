@@ -84,7 +84,7 @@ def emissionMatrix_special(df, emission_matrix):
     for index, row in tqdm(df_merged.iterrows()):  # for every known probabilty
         # append into the emission matrix
         emission_matrix.loc[row['state'], row['word']] = row['Probability']
-    for i in df_train.state.unique().tolist():
+    for i in df.state.unique().tolist():
         emission_matrix.loc[i, '#UNK#'] = float(k/df_denominator.loc[i]+k)
     emission_matrix = emission_matrix.fillna(
         0)   # fill those null cells with zero
@@ -153,4 +153,3 @@ def save_df(df, path):
 
 # print('Part 2 Complete')
 # print(f'time elapsed {time.time()-start_time} seconds')
-
