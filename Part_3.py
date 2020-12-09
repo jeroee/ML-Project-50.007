@@ -84,6 +84,7 @@ def getHelpers(emission_matrix, transition_matrix):
 
 
 def single_Viterbi(tweet, logged_emission, logged_transition, transition_np, states, tags):
+    len_states = len(states)
     Viterbi = []
     forward_steps = len(tweet)+1
     for i in range(forward_steps):
@@ -96,15 +97,15 @@ def single_Viterbi(tweet, logged_emission, logged_transition, transition_np, sta
                     t+e for t, e in zip(logged_transition.loc['START'].drop('STOP'), logged_emission['#UNK#'])]
             Viterbi.append(layer)  # append first layer
         elif i != 0 and i != forward_steps-1:  # not first or last layer
-            prev_layer_prob = Viterbi[-1]*21
-            prev_layer_prob = np.array(prev_layer_prob).reshape(21, 21).T
+            prev_layer_prob = Viterbi[-1]*len_states
+            prev_layer_prob = np.array(prev_layer_prob).reshape(len_states, len_states).T
             m = prev_layer_prob + transition_np
             if tweet[i] in tags.keys():
-                emission_ls = logged_emission[tweet[i]].tolist()*21
-                emission_np = np.array(emission_ls).reshape(21, 21)
+                emission_ls = logged_emission[tweet[i]].tolist()*len_states
+                emission_np = np.array(emission_ls).reshape(len_states, len_states)
             elif tweet[i] not in tags.keys():
-                emission_ls = logged_emission['#UNK#'].tolist()*21
-                emission_np = np.array(emission_ls).reshape(21, 21)
+                emission_ls = logged_emission['#UNK#'].tolist()*len_states
+                emission_np = np.array(emission_ls).reshape(len_states, len_states)
             matrix = (m + emission_np)
             layer = np.amax(matrix, 0)
             Viterbi.append(layer.tolist())
@@ -183,7 +184,7 @@ CN_pred_3 = 'CN/dev_p3.pred'
 print('Starting Part 3')
 start_time = time.time()
 output(EN_train, EN_test, EN_pred_3)
-# output(SG_train, SG_test, SG_pred_3)
-# output(CN_train, CN_test, CN_pred_3)
+output(SG_train, SG_test, SG_pred_3)
+output(CN_train, CN_test, CN_pred_3)
 print('Part 3 Complete')
 print(f'time elapsed {time.time()-start_time} seconds')
