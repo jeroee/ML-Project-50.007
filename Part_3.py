@@ -95,9 +95,10 @@ def Vertibri(documents, emission_matrix, transition_matrix):
         ['START']).drop('STOP', axis=1).to_numpy()
     states = emission_matrix.index.tolist()
     big_ls = []
-    Vertibri = []
+    # Vertibri = []
     print('forward propogation')
     for document in tqdm(documents):
+        Vertibri = []
         forward_steps = len(document)+1
         for i in range(forward_steps):
             if i == 0:  # for from START to first layer
@@ -155,6 +156,7 @@ def Vertibri(documents, emission_matrix, transition_matrix):
             position_last_max = pos_max_value
         big_state.append(state_order)
 
+
     # -------------------------------------------------------------------------------
 '''
 END
@@ -172,47 +174,210 @@ def tag_system_3(states, df):
     return df
 
 
-# file paths
-EN_train = 'EN/train'
-SG_train = 'SG/train'
-CN_train = 'CN/train'
-EN_test = 'EN/dev.in'
-SG_test = 'SG/dev.in'
-CN_test = 'CN/dev.in'
-EN_pred_3 = 'EN/dev_p3.pred'
-SG_pred_3 = 'SG/dev_p3.pred'
-CN_pred_3 = 'CN/dev_p3.pred'
-files = [['EN', EN_train, EN_test, EN_pred_3],
-         ['SG', SG_train, SG_test, SG_pred_3],
-         ['CN', CN_train, CN_test, CN_pred_3]]
+def getHelpers(emission_matrix, transition_matrix):
+    logged_emission = log(emission_matrix)
+    logged_transition = log(transition_matrix)
+    transition_np = logged_transition.drop(
+        ['START']).drop('STOP', axis=1).to_numpy()
+    states = emission_matrix.index.tolist()
+    return logged_emission, logged_transition, transition_np, states
 
-print('Starting Part 3')
-start_time = time.time()
-for i in files:
-    print(f'starting {i[0]}')
-    print('getting emission matrix')
-    df_train = load_train(i[1])
-    # df_test = load_test(i[2])
-    emission_matrix = createMatrix(df_train)
-    emission_matrix = emissionMatrix_special(df_train, emission_matrix)
-    tags = argmax(emission_matrix)
-    print('getting transition matrix')
-    ls = load_train_trans(i[1])
-    transition_matrix = transition_matrix(ls)
-    print('performing Vertibri Algo')
-    documents = load_vertibri_test(i[1])
-    states = Vertibri(documents, emission_matrix, transition_matrix)
-    print('tagging states to documents')
-    df_test = load_test(i[2])
-    df_test = tag_system_3(states, df_test)
-    save_df(df_test, i[3])
 
-    # df_output = tag_system(tags, df_test)
-    # save_df(df_output, i[3])
-    print(f'{i[0]} completed')
+def Vertibri2(tweet, logged_emission, logged_transition, transition_np, states, tags):
+    Vertibri = []
+    forward_steps = len(tweet)+1
+    for i in range(forward_steps):
+        if i == 0:  # for from START to first layer
+            if tweet[i] in tags.keys():
+                layer = [
+                    t+e for t, e in zip(logged_transition.loc['START'].drop('STOP'), logged_emission[tweet[i]])]
+            elif tweet[i] not in tags.keys():
+                layer = [
+                    t+e for t, e in zip(logged_transition.loc['START'].drop('STOP'), logged_emission['#UNK#'])]
+            Vertibri.append(layer)  # append first layer
+        elif i != 0 and i != forward_steps-1:  # not first or last layer
+            prev_layer_prob = Vertibri[-1]*21
+            prev_layer_prob = np.array(prev_layer_prob).reshape(21, 21).T
+            m = prev_layer_prob + transition_np
+            if tweet[i] in tags.keys():
+                emission_ls = logged_emission[tweet[i]].tolist()*21
+                emission_np = np.array(emission_ls).reshape(21, 21)
+            elif tweet[i] not in tags.keys():
+                emission_ls = logged_emission['#UNK#'].tolist()*21
+                emission_np = np.array(emission_ls).reshape(21, 21)
+            matrix = (m + emission_np)
+            layer = np.amax(matrix, 0)
+            Vertibri.append(layer.tolist())
+        elif i == forward_steps-1:
+            prev_layer_prob = np.array(Vertibri[-1])
+            last = logged_transition.drop('START')['STOP'].tolist()
+            layer = prev_layer_prob+last
+            # gets the position of the maximum in the last one
+            pos_max_layer = (layer.tolist().index(max(layer)))
+            Vertibri.append(layer.tolist())
+            # this step is correct alr, forward prop done
+    # back prop starts here
+    Vertibri_trim = Vertibri[:-1]
+    state_order = []
+    # Iterate through each layer find the argmax for the layer and continue
+    for layer in Vertibri_trim[::-1]:
+        # List that holds the summed value of the last term with the second last layer
+        intermediate_arr = np.array(layer)
+        intermediate_ls = intermediate_arr + transition_np[:, pos_max_layer]
+        # Find the argmax for the layer
+        pos_max_value = np.max(intermediate_ls)
+        pos_max_layer = np.argmax(intermediate_ls)
+        # Insert into the state order
+        state_order.insert(0, states[pos_max_layer])
+    return state_order
 
-print('Part 3 Complete')
-print(f'time elapsed {time.time()-start_time} seconds')
+
+def Vertibri(documents, emission_matrix, transition_matrix):
+    # forward propogation
+    logged_emission = log(emission_matrix)
+    logged_transition = log(transition_matrix)
+    transition_np = logged_transition.drop(
+        ['START']).drop('STOP', axis=1).to_numpy()
+    states = emission_matrix.index.tolist()
+    big_ls = []
+    # Vertibri = []
+    print('forward propogation')
+    for document in tqdm(documents):
+        Vertibri = []
+        forward_steps = len(document)+1
+        for i in range(forward_steps):
+            if i == 0:  # for from START to first layer
+                if document[i] in tags.keys():
+                    layer = [
+                        t+e for t, e in zip(logged_transition.loc['START'].drop('STOP'), logged_emission[document[i]])]
+                elif document[i] not in tags.keys():
+                    layer = [
+                        t+e for t, e in zip(logged_transition.loc['START'].drop('STOP'), logged_emission['#UNK#'])]
+                Vertibri.append(layer)
+            elif i != 0 and i != forward_steps-1:  # not first or last step
+                prev_layer_prob = Vertibri[-1]*21
+                prev_layer_prob = np.array(prev_layer_prob).reshape(21, 21).T
+                m = prev_layer_prob + transition_np
+                if document[i] in tags.keys():
+                    emission_ls = logged_emission[document[i]].tolist()*21
+                    emission_np = np.array(emission_ls).reshape(21, 21)
+                elif document[i] not in tags.keys():
+                    emission_ls = logged_emission['#UNK#'].tolist()*21
+                    emission_np = np.array(emission_ls).reshape(21, 21)
+                matrix = (m + emission_np)
+                layer = np.amax(matrix, 0)
+                Vertibri.append(layer.tolist())
+            elif i == forward_steps-1:
+                prev_layer_prob = np.array(Vertibri[-1])
+                last = logged_transition.drop('START')['STOP'].tolist()
+                layer = prev_layer_prob+last
+                # gets the position of the maximum in the last one
+                position_last_max = (layer.tolist().index(max(layer)))
+                Vertibri.append(layer.tolist())
+        big_ls.append(Vertibri)
+    # -------------------------------------------------------------------------------
+    # backward propogation
+
+    # Stores the states
+    big_state = []
+    state_order = []
+    print('backward propogation')
+    for Vertibri in tqdm(big_ls):
+        # Create a trimmed one with all less the stop column
+        Vertibri_trim = Vertibri[:-1]
+
+        # Iterate through each layer find the argmax for the layer and continue
+        for layer in Vertibri_trim[::-1]:
+            # List that holds the summed value of the last term with the second last layer
+            intermediate_ls = []
+            intermediate_ls = [
+                x+transition_np[layer.index(x), pos_max_layer] for x in layer]
+            # Find the argmax for the layer
+            pos_max_value = np.max(intermediate_ls)
+            pos_max_layer = np.argmax(intermediate_ls)
+            # Insert into the state order
+            state_order.insert(0, states[pos_max_layer])
+            # Update the value of position_last_max
+            position_last_max = pos_max_value
+        big_state.append(state_order)
+
+
+file_train = 'EN/train'
+file_test = 'EN/dev.in'
+df_train = load_train(file_train)
+emission_matrix = createMatrix(df_train)
+emission_matrix = emissionMatrix_special(df_train, emission_matrix)
+tags = argmax(emission_matrix)
+print('getting transition matrix')
+ls = load_train_trans(file_train)
+transition_matrix = transition_matrix(ls)
+logged_emission, logged_transition, transition_np, states = getHelpers(
+    emission_matrix, transition_matrix)
+tweets = load_vertibri_test(file_test)
+#------------------ big vertibri ---------------------
+big_states = []
+for tweet in tqdm(tweets):
+    single_state = Vertibri2(tweet, logged_emission, logged_transition,
+                             transition_np, states, tags)
+    single_state.append(' ')
+    big_states.append(single_state)
+# flat map this shit
+states = [item for single_state in big_states for item in single_state]
+#---------------------
+df = load_test(file_test)
+df['states']=states
+path = 'EN/dev_p3.pred'
+save_df(df,path)
+
+
+
+
+# print(test)
+# print(len(single_state))
+# print(single_state)
+
+
+# # file paths
+# EN_train = 'EN/train'
+# SG_train = 'SG/train'
+# CN_train = 'CN/train'
+# EN_test = 'EN/dev.in'
+# SG_test = 'SG/dev.in'
+# CN_test = 'CN/dev.in'
+# EN_pred_3 = 'EN/dev_p3.pred'
+# SG_pred_3 = 'SG/dev_p3.pred'
+# CN_pred_3 = 'CN/dev_p3.pred'
+# files = [['EN', EN_train, EN_test, EN_pred_3],
+#          ['SG', SG_train, SG_test, SG_pred_3],
+#          ['CN', CN_train, CN_test, CN_pred_3]]
+
+# print('Starting Part 3')
+# start_time = time.time()
+# for i in files:
+#     print(f'starting {i[0]}')
+#     print('getting emission matrix')
+#     df_train = load_train(i[1])
+#     # df_test = load_test(i[2])
+#     emission_matrix = createMatrix(df_train)
+#     emission_matrix = emissionMatrix_special(df_train, emission_matrix)
+#     tags = argmax(emission_matrix)
+#     print('getting transition matrix')
+#     ls = load_train_trans(i[1])
+#     transition_matrix = transition_matrix(ls)
+#     print('performing Vertibri Algo')
+#     documents = load_vertibri_test(i[1])
+#     states = Vertibri(documents, emission_matrix, transition_matrix)
+#     print('tagging states to documents')
+#     df_test = load_test(i[2])
+#     df_test = tag_system_3(states, df_test)
+#     save_df(df_test, i[3])
+
+#     # df_output = tag_system(tags, df_test)
+#     # save_df(df_output, i[3])
+#     print(f'{i[0]} completed')
+
+# print('Part 3 Complete')
+# print(f'time elapsed {time.time()-start_time} seconds')
 
 
 # def log(x, inf_replace=-1000):
