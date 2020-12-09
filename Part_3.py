@@ -126,7 +126,7 @@ def Vertibri(documents, emission_matrix, transition_matrix):
                 last = logged_transition.drop('START')['STOP'].tolist()
                 layer = prev_layer_prob+last
                 # gets the position of the maximum in the last one
-                position_last_max = (layer.tolist().index(max(layer)))
+                pos_max_layer = (layer.tolist().index(max(layer)))
                 Vertibri.append(layer.tolist())
         big_ls.append(Vertibri)
     # -------------------------------------------------------------------------------
@@ -144,8 +144,7 @@ def Vertibri(documents, emission_matrix, transition_matrix):
         for layer in Vertibri_trim[::-1]:
             # List that holds the summed value of the last term with the second last layer
             intermediate_ls = []
-            intermediate_ls = [
-                x+transition_np[layer.index(x), pos_max_layer] for x in layer]
+            intermediate_ls = [x+transition_np[layer.index(x), pos_max_layer] for x in layer]
             # Find the argmax for the layer
             pos_max_value = np.max(intermediate_ls)
             pos_max_layer = np.argmax(intermediate_ls)
@@ -154,7 +153,6 @@ def Vertibri(documents, emission_matrix, transition_matrix):
             # Update the value of position_last_max
             position_last_max = pos_max_value
         big_state.append(state_order)
-
     # -------------------------------------------------------------------------------
 '''
 END
@@ -164,11 +162,14 @@ END
 
 def tag_system_3(states, df):
     states_ls = []
-    for state in states:
-        for i in state:
-            states_ls.append(i)
-        states_ls.append(' ')
-    df['states'] = states_ls
+    try: 
+        for state in states:
+            for i in state:
+                states_ls.append(i)
+            states_ls.append(' ')
+        df['states'] = states_ls
+    except: 
+        pass
     return df
 
 
@@ -197,6 +198,7 @@ for i in files:
     emission_matrix = emissionMatrix_special(df_train, emission_matrix)
     tags = argmax(emission_matrix)
     print('getting transition matrix')
+
     ls = load_train_trans(i[1])
     transition_matrix = transition_matrix(ls)
     print('performing Vertibri Algo')
