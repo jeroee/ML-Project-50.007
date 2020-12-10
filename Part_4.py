@@ -145,24 +145,32 @@ def single_Viterbi(tweet, logged_emission, logged_transition, transition_np, sta
             # gets the position of the maximum in the last one
             # pos_max_layer = (layer.tolist().index(max(layer)))
             Viterbi.append(layer.tolist())
-            print(Viterbi)
-            print(len(Viterbi))
+            # print(Viterbi)
+            # print(len(Viterbi))
             print(pos_max_layer)
             break
             # this step is correct alr, forward prop done
     # back prop starts here
     Viterbi_trim = Viterbi[:-1]
     state_order = []
+    #Replicate 3x
+    def f2(x): return np.repeat(x, 3)
     # Iterate through each layer find the argmax for the layer and continue
     for layer in Viterbi_trim[::-1]:
-        # List that holds the summed value of the last term with the second last layer
-        intermediate_arr = np.array(layer)
-        intermediate_ls = intermediate_arr + transition_np[:, pos_max_layer]
-        # Find the argmax for the layer
-        pos_max_value = np.max(intermediate_ls)
-        pos_max_layer = np.argmax(intermediate_ls)
+        #Flatten the layer into a list that has 63 characters (for Eng)
+        flat_list = [item for sublist in layer for item in sublist]
+        intermediate_arr = np.array(flat_list)
+        #print(intermediate_arr.shape)
+        transition_np_x3 = np.apply_along_axis(f2, 0, transition_np[:, pos_max_layer])
+        #print(transition_np_x3.shape, intermediate_arr.shape)
+        print(intermediate_arr[0], transition_np_x3[0])
+        intermediate_ls = intermediate_arr + transition_np_x3
+        print(intermediate_ls[0])
+        #Find the argmax for the layer
+        pos_max_layer = np.argmax(intermediate_ls)//3
         # Insert into the state order
         state_order.insert(0, states[pos_max_layer])
+        print(states[pos_max_layer])
     return state_order
 
 
@@ -177,7 +185,7 @@ transition_matrix1 = transition_matrix(ls)
 logged_emission, logged_transition, transition_np, states = getHelpers(
     emission_matrix, transition_matrix1)
 tweets = pre_vertibri_load(file_test)
-tweet = tweets[3]  # test with second item
+tweet = tweets[2]  # test with second item
 single_state = single_Viterbi(
     tweet, logged_emission, logged_transition, transition_np, states, tags)
 print(single_state)

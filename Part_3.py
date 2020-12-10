@@ -128,6 +128,7 @@ def single_Viterbi(tweet, logged_emission, logged_transition, transition_np, sta
         # Find the argmax for the layer
         pos_max_value = np.max(intermediate_ls)
         pos_max_layer = np.argmax(intermediate_ls)
+        print(pos_max_value)
         # Insert into the state order
         state_order.insert(0, states[pos_max_layer])
     return state_order
