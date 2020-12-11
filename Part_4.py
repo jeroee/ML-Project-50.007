@@ -110,18 +110,23 @@ def single_Viterbi(tweet, logged_emission, logged_transition, transition_np, sta
                 emission_np = np.array(emission_ls).reshape(
                     len_states, len_states)
             matrix = (m + emission_np)
-            layer = np.sort(np.partition(matrix.T, -3, axis=1)[:, -3:], axis=1)
-            # layer = np.amax(matrix, axis=0)
+            matrix = matrix.T
+            # need to include index
+            # computing top 3 paths's indexes
+            indexes_3 = np.argsort(matrix, axis=1)[:, -3:][:, ::-1]
+            # computing top 3 paths values
+            values_3 = np.sort(np.partition(
+                matrix, -3, axis=1)[:, -3:], axis=1)[:, ::-1]
+            # merging index and value in (index,value) tuple
+            layer = np.rec.fromarrays([indexes_3, values_3])
             Viterbi.append(layer.tolist())
+            # print(Viterbi)
         elif i != 0 and i != forward_steps-1:  # not first,second or last layer
-            # prev_layer_prob = Viterbi[-1]*len_states
-            # prev_layer_prob = np.array(prev_layer_prob).reshape(
-            #     len_states, len_states).T
-            # m = prev_layer_prob + transition_np
             def f(x): return np.repeat(x, len_states)
-            prev_layer_prob = np.apply_along_axis(f, 1, np.array(Viterbi[-1]))
+            prev_layer_prob = np.apply_along_axis(f, 1, values_3)   # (21x63)
             m = prev_layer_prob + \
-                np.hstack((transition_np, transition_np, transition_np))
+                np.hstack((transition_np, transition_np, transition_np)
+                          )   # getting logged transition matrix concatanated across 3x   (21x63)
             if tweet[i] in tags.keys():
                 emission_ls = logged_emission[tweet[i]].tolist()*len_states
                 emission_np = np.array(emission_ls).reshape(
@@ -130,91 +135,118 @@ def single_Viterbi(tweet, logged_emission, logged_transition, transition_np, sta
                 emission_ls = logged_emission['#UNK#'].tolist()*len_states
                 emission_np = np.array(emission_ls).reshape(
                     len_states, len_states)
+            # getting logged emission matrix concatanated across 3x  (21x63)
             matrix = (m + np.hstack((emission_np, emission_np, emission_np)))
-            layer = np.sort(np.partition(matrix, -3, axis=1)[:, -3:], axis=1)
+            # need to transpose internally for 1st,2nd,3rd matrices which are concatenated side by side
+            # split matrices into 3 smaller matrices. each will be 1st,2nd,3rd from prev nodes
+            newarr = np.array_split(matrix, 3, axis=1)
+            # transpose all smaller matrices
+            transposed = [i.T for i in newarr]
+            matrix_transposed = np.hstack(
+                (transposed[0], transposed[1], transposed[2]))  # join back again side by side
+            # print(matrix_transposed.shape)
+            values_3 = np.sort(np.partition(
+                matrix_transposed, -3, axis=1)[:, -3:], axis=1)[:, ::-1]  # computing top 3 paths's values
+            indexes_3 = np.argsort(matrix_transposed, axis=1)[
+                :, -3:][:, ::-1]  # computing top 3 paths's indexes
+            # if its >=21 and <42, take value - 21
+            arr = np.where((indexes_3 >= 21) & (
+                indexes_3 < 42), indexes_3-21, indexes_3)
+            # if its >=42 take value -42
+            indexes_3 = np.where(arr >= 42, arr-42, arr)
+            # merging index and value in (index,value) tuple
+            layer = np.rec.fromarrays([indexes_3, values_3])
             Viterbi.append(layer.tolist())
         elif i == forward_steps-1:
-            prev_layer_prob = np.array(Viterbi[-1])
+            # prev_layer_prob = np.array(Viterbi[-1])
+            prev_layer_prob = values_3
             last = np.array(logged_transition.drop('START')
-                            ['STOP']).reshape(len_states, 1)
-            # last = logged_transition.drop('START')['STOP'].tolist()
+                            ['STOP']).reshape(len_states, 1)  # getting transition matrix to STOP
             layer = prev_layer_prob+np.hstack((last, last, last))
-            layer_flatten = layer.flatten()
-            value = np.partition(layer_flatten, -3)[-3]
-            pos_max_layer = layer_flatten.tolist().index(value)//3
-            # gets the position of the maximum in the last one
-            # pos_max_layer = (layer.tolist().index(max(layer)))
-            Viterbi.append(layer.tolist())
-            print(Viterbi)
-            print(len(Viterbi))
-            print(pos_max_layer)
-            break
+            layer_flatten = layer.flatten().reshape(1, 63)
+            indexes = np.argsort(layer_flatten, axis=1)[
+                :, -3:][:, ::-1]   # getting the top 3 indexes
+            # locating nodes from top 3 indexes
+            indexes = np.where(indexes, indexes//3, indexes)
+            values = np.sort(np.partition(
+                layer_flatten, -3, axis=1)[:, -3:], axis=1)[:, ::-1]  # computing top 3 paths's values
+            layer = np.rec.fromarrays([indexes, values])
+            # print(layer)
+            latest_tuple = layer[0][2]
+            current_index = layer[0][2][0]
             # this step is correct alr, forward prop done
     # back prop starts here
-    Viterbi_trim = Viterbi[:-1]
     state_order = []
+    state_order.append(states[latest_tuple[0]])
+    latest_list = list(latest_tuple)
+    latest_list.append(current_index)
+    current_word = tweet[len(tweet)-1]
+    # The format of the new list (not tuple), is going to be [index, value, current index(the row value of it)]
     # Iterate through each layer find the argmax for the layer and continue
+    Viterbi_trim = Viterbi[:-1]
     for layer in Viterbi_trim[::-1]:
-        # List that holds the summed value of the last term with the second last layer
-        intermediate_arr = np.array(layer)
-        intermediate_ls = intermediate_arr + transition_np[:, pos_max_layer]
-        # Find the argmax for the layer
-        pos_max_value = np.max(intermediate_ls)
-        pos_max_layer = np.argmax(intermediate_ls)
-        # Insert into the state order
-        state_order.insert(0, states[pos_max_layer])
+        # Get the transition probability to add
+        transition_prob = logged_transition.at[states[latest_list[0]],
+                                               states[latest_list[2]]]
+        # Get the emission probability to add
+        # 1. get the state which is the row value for the emission matrix
+        current_state = states[latest_list[2]]
+        # Use .loc to find the emission
+        try:
+            emission_prob = logged_emission.loc[current_state, current_word]
+        except:
+            emission_prob = logged_emission.loc[current_state, '#UNK#']
+        # Flatten the latest_list which has the 3 values we want to consider
+        try:
+            flatten = [item for sublist in layer[latest_list[0]]
+                       for item in sublist]
+            # Get the values to compare
+            only_values = flatten[1::3]
+            # substract the transition and emission probabilities from value
+            back_value = latest_list[1] - emission_prob - transition_prob
+            # Substract the values in the only_values by the back value
+            minus_values = [x-back_value for x in only_values]
+            # Get the minimum index, which will point towards the new tuple we want
+            min_position = minus_values.index(min(minus_values))
+            # Get the new tuple
+            current_index = latest_list[0]
+            latest_tuple = layer[latest_list[0]][min_position]
+            latest_list = list(latest_tuple)
+            latest_list.append(current_index)
+            # Append the states
+            state_order.insert(0, states[latest_list[0]])
+        except:
+            flatten = layer[latest_list[0]]
+            state_order.insert(0, states[latest_list[0]])
     return state_order
 
 
-file_train = 'EN/train'
-file_test = 'EN/dev.in'
-df_train = load_train(file_train)
-emission_matrix = createMatrix(df_train)
-emission_matrix = emissionMatrix_special(df_train, emission_matrix)
-tags = argmax(emission_matrix)
-ls = load_train_trans(file_train)
-transition_matrix1 = transition_matrix(ls)
-logged_emission, logged_transition, transition_np, states = getHelpers(
-    emission_matrix, transition_matrix1)
-tweets = pre_vertibri_load(file_test)
-tweet = tweets[3]  # test with second item
-single_state = single_Viterbi(
-    tweet, logged_emission, logged_transition, transition_np, states, tags)
-print(single_state)
-
-
-# this is cfm alr
-# def output(file_train, file_test, path):
-#     # file_train = 'EN/train'
-#     # file_test = 'EN/dev.in'
-#     df_train = load_train(file_train)
-#     emission_matrix = createMatrix(df_train)
-#     emission_matrix = emissionMatrix_special(df_train, emission_matrix)
-#     tags = argmax(emission_matrix)
-#     print('getting transition matrix')
-#     ls = load_train_trans(file_train)
-#     transition_matrix1 = transition_matrix(ls)
-#     logged_emission, logged_transition, transition_np, states = getHelpers(
-#         emission_matrix, transition_matrix1)
-#     tweets = pre_vertibri_load(file_test)
-#     # ------------------ big vertibri ---------------------
-#     big_states = []
-#     for tweet in tqdm(tweets):
-#         single_state = single_Viterbi(tweet, logged_emission, logged_transition,
-#                                       transition_np, states, tags)
-#         single_state.append(' ')
-#         big_states.append(single_state)
-#     # flat map this shit
-#     states = [item for single_state in big_states for item in single_state]
-#     # ---------------------
-#     df = load_test(file_test)
-#     df['states'] = states
-#     save_df(df, path)
-
-
-# print(test)
-# print(len(single_state))
-# print(single_state)
+def output(file_train, file_test, path):
+    # file_train = 'EN/train'
+    # file_test = 'EN/dev.in'
+    df_train = load_train(file_train)
+    emission_matrix = createMatrix(df_train)
+    emission_matrix = emissionMatrix_special(df_train, emission_matrix)
+    tags = argmax(emission_matrix)
+    print('getting transition matrix')
+    ls = load_train_trans(file_train)
+    transition_matrix1 = transition_matrix(ls)
+    logged_emission, logged_transition, transition_np, states = getHelpers(
+        emission_matrix, transition_matrix1)
+    tweets = pre_vertibri_load(file_test)
+    # ------------------ big vertibri ---------------------
+    big_states = []
+    for tweet in tqdm(tweets):
+        single_state = single_Viterbi(tweet, logged_emission, logged_transition,
+                                      transition_np, states, tags)
+        single_state.append(' ')
+        big_states.append(single_state)
+    # flat map this shit
+    states = [item for single_state in big_states for item in single_state]
+    # ---------------------
+    df = load_test(file_test)
+    df['states'] = states
+    save_df(df, path)
 
 
 # # file paths
@@ -224,14 +256,12 @@ CN_train = 'CN/train'
 EN_test = 'EN/dev.in'
 SG_test = 'SG/dev.in'
 CN_test = 'CN/dev.in'
-EN_pred_3 = 'EN/dev_p3.pred'
-SG_pred_3 = 'SG/dev_p3.pred'
-CN_pred_3 = 'CN/dev_p3.pred'
+EN_pred_4 = 'EN/dev_p4.pred'
+SG_pred_4 = 'SG/dev_p4.pred'
+CN_pred_4 = 'CN/dev_p4.pred'
 
-# print('Starting Part 3')
-# start_time = time.time()
-# output(EN_train, EN_test, EN_pred_3)
-# output(SG_train, SG_test, SG_pred_3)
-# output(CN_train, CN_test, CN_pred_3)
-# print('Part 3 Complete')
-# print(f'time elapsed {time.time()-start_time} seconds')
+print('Starting Part 4')
+start_time = time.time()
+output(EN_train, EN_test, EN_pred_4)
+print('Part 4 Complete')
+print(f'time elapsed {time.time()-start_time} seconds')

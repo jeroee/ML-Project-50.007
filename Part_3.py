@@ -23,7 +23,6 @@ def load_train_trans(training_file):
 
 # load test file dev.in into a single column df
 
-
 def load_test(testing_file):
     ls = []
     f = open(testing_file, encoding="utf8")
@@ -98,14 +97,17 @@ def single_Viterbi(tweet, logged_emission, logged_transition, transition_np, sta
             Viterbi.append(layer)  # append first layer
         elif i != 0 and i != forward_steps-1:  # not first or last layer
             prev_layer_prob = Viterbi[-1]*len_states
-            prev_layer_prob = np.array(prev_layer_prob).reshape(len_states, len_states).T
+            prev_layer_prob = np.array(prev_layer_prob).reshape(
+                len_states, len_states).T
             m = prev_layer_prob + transition_np
             if tweet[i] in tags.keys():
                 emission_ls = logged_emission[tweet[i]].tolist()*len_states
-                emission_np = np.array(emission_ls).reshape(len_states, len_states)
+                emission_np = np.array(emission_ls).reshape(
+                    len_states, len_states)
             elif tweet[i] not in tags.keys():
                 emission_ls = logged_emission['#UNK#'].tolist()*len_states
-                emission_np = np.array(emission_ls).reshape(len_states, len_states)
+                emission_np = np.array(emission_ls).reshape(
+                    len_states, len_states)
             matrix = (m + emission_np)
             layer = np.amax(matrix, 0)
             Viterbi.append(layer.tolist())
@@ -133,11 +135,9 @@ def single_Viterbi(tweet, logged_emission, logged_transition, transition_np, sta
     return state_order
 
 
-# this is cfm alr
 def output(file_train, file_test, path):
-    # file_train = 'EN/train'
-    # file_test = 'EN/dev.in'
     df_train = load_train(file_train)
+    print('getting emission matrix')
     emission_matrix = createMatrix(df_train)
     emission_matrix = emissionMatrix_special(df_train, emission_matrix)
     tags = argmax(emission_matrix)
@@ -162,11 +162,6 @@ def output(file_train, file_test, path):
     save_df(df, path)
 
 
-# print(test)
-# print(len(single_state))
-# print(single_state)
-
-
 # # file paths
 EN_train = 'EN/train'
 SG_train = 'SG/train'
@@ -177,9 +172,6 @@ CN_test = 'CN/dev.in'
 EN_pred_3 = 'EN/dev_p3.pred'
 SG_pred_3 = 'SG/dev_p3.pred'
 CN_pred_3 = 'CN/dev_p3.pred'
-# files = [['EN', EN_train, EN_test, EN_pred_3],
-#          ['SG', SG_train, SG_test, SG_pred_3],
-#          ['CN', CN_train, CN_test, CN_pred_3]]
 
 print('Starting Part 3')
 start_time = time.time()
