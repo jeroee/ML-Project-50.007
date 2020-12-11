@@ -141,14 +141,13 @@ def single_Viterbi(tweet, logged_emission, logged_transition, transition_np, sta
             layer = prev_layer_prob+np.hstack((last, last, last))
             layer_flatten = layer.flatten()
             value = np.partition(layer_flatten, -3)[-3]
-            pos_max_layer = layer_flatten.tolist().index(value)//3
+            #pos_max_layer = layer_flatten.tolist().index(value)//3
+           
+            '''Debugging'''
+            pos_max_layer = 7
             # gets the position of the maximum in the last one
             # pos_max_layer = (layer.tolist().index(max(layer)))
             Viterbi.append(layer.tolist())
-            # print(Viterbi)
-            # print(len(Viterbi))
-            print(pos_max_layer)
-            break
             # this step is correct alr, forward prop done
     # back prop starts here
     Viterbi_trim = Viterbi[:-1]
@@ -158,19 +157,20 @@ def single_Viterbi(tweet, logged_emission, logged_transition, transition_np, sta
     # Iterate through each layer find the argmax for the layer and continue
     for layer in Viterbi_trim[::-1]:
         #Flatten the layer into a list that has 63 characters (for Eng)
-        flat_list = [item for sublist in layer for item in sublist]
+        try:
+            flat_list = [item for sublist in layer for item in sublist]
+        except: 
+            flast_list = layer
         intermediate_arr = np.array(flat_list)
         #print(intermediate_arr.shape)
+        print(transition_np[:, pos_max_layer])
         transition_np_x3 = np.apply_along_axis(f2, 0, transition_np[:, pos_max_layer])
         #print(transition_np_x3.shape, intermediate_arr.shape)
-        print(intermediate_arr[0], transition_np_x3[0])
-        intermediate_ls = intermediate_arr + transition_np_x3
-        print(intermediate_ls[0])
+        intermediate_ls = np.add(intermediate_arr, transition_np_x3)
         #Find the argmax for the layer
         pos_max_layer = np.argmax(intermediate_ls)//3
         # Insert into the state order
         state_order.insert(0, states[pos_max_layer])
-        print(states[pos_max_layer])
     return state_order
 
 
